@@ -1,0 +1,118 @@
+@import "tailwindcss";
+
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
+@theme {
+  --color-cream:    #f4ede0;
+  --color-cream-2:  #ebe1cf;
+  --color-ink:      #1a1612;
+  --color-ink-soft: #3d342a;
+  --color-red:      #d63a2f;
+  --color-mustard:  #e0a13a;
+  --color-teal:     #2d6363;
+
+  --font-serif:   "Fraunces", Georgia, serif;
+  --font-mono:    "JetBrains Mono", monospace;
+  --font-display: "Instrument Serif", serif;
+
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+  --animate-fade-in:   fade-in 0.3s ease;
+}
+
+/* ── Keyframes ───────────────────────────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-cream text-ink font-serif m-0;
+    font-optical-sizing: auto;
+    line-height: 1.45;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(214,58,47,0.06)  0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(224,161,58,0.08) 0%, transparent 40%);
+  }
+}
+
+/* ── Utilities ───────────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Hide scrollbar cross-browser */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Components ──────────────────────────────────────────────────────────────── */
+@layer components {
+  /**
+   * Editable input — must inherit the surrounding typographic context
+   * (heading size, mono font, italic, etc.) so we can't use utility classes alone.
+   */
+  .editable-input {
+    @apply w-full border border-dashed border-ink p-1;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 0;
+    font:           inherit;
+    letter-spacing: inherit;
+    line-height:    inherit;
+    color:          inherit;
+    resize:         none;
+  }
+  .editable-input.multiline {
+    resize:     vertical;
+    min-height: 60px;
+  }
+
+  /* ── Chip variants (from chipClass.ts) ───────────────────────────────────
+   * chip-base is NOT a separate class — @apply can't reference @layer components
+   * classes in Tailwind v4. The shared declarations are inlined into each variant.
+   * Shared: font-mono text-[10px] tracking-[0.05em] px-2 py-0.5 border inline-block
+   * ─────────────────────────────────────────────────────────────────────────── */
+
+  .chip-default {
+    @apply font-mono text-[10px] tracking-[0.05em] px-2 py-0.5 border inline-block;
+    @apply bg-cream-2 text-ink-soft border-ink/15;
+  }
+
+  .chip-df {
+    @apply font-mono text-[10px] tracking-[0.05em] px-2 py-0.5 border inline-block;
+    background:   rgba(45, 99, 99, 0.15);
+    color:        var(--color-teal);
+    border-color: rgba(45, 99, 99, 0.3);
+  }
+
+  .chip-cash {
+    @apply font-mono text-[10px] tracking-[0.05em] px-2 py-0.5 border inline-block;
+    background:   rgba(214, 58, 47, 0.12);
+    color:        var(--color-red);
+    border-color: rgba(214, 58, 47, 0.25);
+  }
+
+  .chip-rez {
+    @apply font-mono text-[10px] tracking-[0.05em] px-2 py-0.5 border inline-block;
+    background:   rgba(224, 161, 58, 0.2);
+    color:        #8a5d10;
+    border-color: rgba(224, 161, 58, 0.4);
+  }
+
+  .chip-must {
+    @apply font-mono text-[10px] tracking-[0.05em] px-2 py-0.5 border inline-block;
+    @apply bg-ink text-cream border-ink font-semibold;
+  }
+}
