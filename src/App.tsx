@@ -1,4 +1,15 @@
 import { useRef } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { useItinerary } from "./hooks/useItinerary";
 import { AppHeader } from "./components/AppHeader";
 import { DayNav } from "./components/DayNav";
@@ -19,9 +30,12 @@ export default function App() {
     showDay,
     toggleEditing,
     updateCurrentDay,
-    updateStop,
+    updateSlot,
+    updateEvent,
+    swapEvents,
+    reorderEvents,
+    insertStop,
     deleteStop,
-    addStop,
     toggleCheck,
     addCheck,
     removeCheck,
@@ -37,6 +51,31 @@ export default function App() {
         contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
       50
     );
+  };
+
+  // ── dnd-kit sensors ──────────────────────────────────────────────────────────
+  // PointerSensor with a small distance threshold prevents accidental drags on
+  // click. KeyboardSensor lets keyboard users reorder with arrow keys.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (dragEvent: DragEndEvent) => {
+    const { active, over } = dragEvent;
+    if (!over || active.id === over.id || !currentDay) return;
+
+    // Guard against null JSONB columns (same defensive pattern as DayView)
+    const slots = currentDay.slots ?? [];
+    const events = currentDay.events ?? {};
+
+    // active.id and over.id are event IDs (not slot IDs)
+    const eventIds = slots.map((s) => events[s.id]?.id);
+    const oldIndex = eventIds.indexOf(active.id as string);
+    const newIndex = eventIds.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    reorderEvents(oldIndex, newIndex);
   };
 
   if (loading) {
@@ -73,14 +112,23 @@ export default function App() {
 
       <main ref={contentRef}>
         {currentDay && (
-          <DayView
-            day={currentDay}
-            editing={editing}
-            onUpdateDay={updateCurrentDay}
-            onUpdateStop={updateStop}
-            onDeleteStop={deleteStop}
-            onAddStop={addStop}
-          />
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={handleDragEnd}
+          >
+            <DayView
+              day={currentDay}
+              editing={editing}
+              onUpdateDay={updateCurrentDay}
+              onUpdateSlot={updateSlot}
+              onUpdateEvent={updateEvent}
+              onSwapEvents={swapEvents}
+              onInsertStop={insertStop}
+              onDeleteStop={deleteStop}
+            />
+          </DndContext>
         )}
       </main>
 

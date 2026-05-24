@@ -56,12 +56,39 @@ supabase/
   or when you need `font: inherit` / `letter-spacing: inherit` (which Tailwind can't express).
 - Google Fonts are loaded via `<link>` in `index.html` (not @import in CSS).
 
+## Data model — slots vs events
+
+The schedule uses a **decoupled grid model**:
+
+| Concept | Type | Stored in | What it is |
+|---|---|---|---|
+| `TimeSlot` | `{ id, time }` | `Day.slots: TimeSlot[]` | A fixed grid anchor. Order never changes. |
+| `StopEvent` | `{ id, type, name, detail, … }` | `Day.events: Record<slotId, StopEvent>` | The content payload sitting at a slot. |
+
+**Why:** when events are swapped (future drag-and-drop), only the `events` map is
+mutated — the keys stay the same but the values switch. `slots` is never reordered.
+
+```
+// Swapping event A with event B:
+events[slotA] = eventB
+events[slotB] = eventA   // slots themselves are untouched
+```
+
+`useItinerary` exposes `swapEvents(slotIdA, slotIdB)` for this; drag-and-drop can
+call it directly when wired up.
+
+Mutations:
+- `updateSlot(slotId, patch)` — edit a slot's `time` string only
+- `updateEvent(slotId, event)` — replace the payload at a slot
+- `swapEvents(slotIdA, slotIdB)` — swap payloads between two slots (exported, not yet wired to UI)
+- `addStop()` — appends a new slot+event pair
+- `deleteStop(slotId)` — removes slot from array AND its key from events map
+
 ## Database schema
 
 Three Supabase tables:
 - **`days`** — `id text PK`, `sort_order int`, `day`, `date`, `title`, `subtitle`,
-  `blurb`, `stops jsonb` (Stop[] serialised). Stops are JSONB for simplicity — no
-  separate join tables.
+  `blurb`, `slots jsonb` (TimeSlot[]), `events jsonb` (Record<slotId, StopEvent>).
 - **`check_items`** — `id text PK`, `sort_order int`, `title`, `description`,
   `completed bool`.
 - **`app_state`** — `key text PK`, `value text`. Stores `day_idx` and `editing`.
@@ -71,13 +98,14 @@ Three Supabase tables:
 `INITIAL_DAYS` + `INITIAL_CHECKS` automatically. The "↺ RESET ALL" button
 re-seeds too.
 
-## Data conventions
+**Migration:** if you ran an older schema with `stops jsonb`, drop and recreate
+`days` — see the note at the bottom of `supabase/schema.sql`.
+
+## Other data conventions
 
 - `CheckItem.description` (not `desc`) — matches the DB column name.
 - `Day.sort_order` / `CheckItem.sort_order` — integer, 0-indexed. Used by
   `.order("sort_order")` queries. Increment when adding new rows.
-- Itinerary content is typed: `Day → stops: Stop[]` (JSONB) → each stop has
-  `chips: string[]` and `swaps: Swap[]`.
 - Chips auto-style via `chipClass()` in `src/lib/chipClass.ts`: "must", "df"/"dairy",
   "cash", "reserve"/"book"/"buy tix"/"nightcap" each map to a CSS class variant.
   Add new variants there + a matching `.chip-X` rule in `index.css @layer components`.

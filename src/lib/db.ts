@@ -9,7 +9,15 @@ export async function getDays(): Promise<Day[]> {
     .select("*")
     .order("sort_order");
   if (error) throw error;
-  return (data ?? []) as Day[];
+  // Normalize JSONB columns: Supabase may return null for rows that pre-date
+  // the slots/events migration. Ensure every Day has valid arrays/objects.
+  return (data ?? []).map((row) => ({
+    ...row,
+    slots: Array.isArray(row.slots) ? row.slots : [],
+    events: (row.events && typeof row.events === "object" && !Array.isArray(row.events))
+      ? row.events
+      : {},
+  })) as Day[];
 }
 
 export async function updateDay(

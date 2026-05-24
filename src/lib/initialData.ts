@@ -1,39 +1,66 @@
-import type { Day, CheckItem } from "../types";
+import type { Day, CheckItem, TimeSlot, StopEvent } from "../types";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/** Builds a paired { slot, slotId, event } from a time string + event fields. */
+function makeStop(
+  time: string,
+  data: Omit<StopEvent, "id">
+): { slot: TimeSlot; slotId: string; event: StopEvent } {
+  const slotId = uid();
+  return {
+    slotId,
+    slot: { id: slotId, time },
+    event: { id: uid(), ...data },
+  };
+}
+
+type StopDef = ReturnType<typeof makeStop>;
+
+/** Assembles a Day from base fields + an array of stop definitions. */
+function buildDay(
+  base: Omit<Day, "slots" | "events">,
+  stops: StopDef[]
+): Day {
+  return {
+    ...base,
+    slots: stops.map((s) => s.slot),
+    events: Object.fromEntries(stops.map((s) => [s.slotId, s.event])),
+  };
+}
+
+// ── Seed data ──────────────────────────────────────────────────────────────────
+
 export const INITIAL_DAYS: Day[] = [
-  {
-    id: uid(),
-    sort_order: 0,
-    day: "Tuesday",
-    date: "May 26",
-    title: "Arrival",
-    subtitle: "tacos in Yonkers.",
-    blurb:
-      "Easy first night. She just flew in — keep it close to home, eat well, sleep early. Light Yonkers taco crawl: pick one, or split between two.",
-    stops: [
-      {
-        id: uid(),
-        time: "~2:00 PM",
+  buildDay(
+    {
+      id: uid(),
+      sort_order: 0,
+      day: "Tuesday",
+      date: "May 26",
+      title: "Arrival",
+      subtitle: "tacos in Yonkers.",
+      blurb:
+        "Easy first night. She just flew in — keep it close to home, eat well, sleep early. Light Yonkers taco crawl: pick one, or split between two.",
+    },
+    [
+      makeStop("~2:00 PM", {
         type: "travel",
         name: "Pickup at LGA",
         detail: "Drive ~30 min to Mt Vernon. Take I-678 N → I-95 N.",
         chips: [],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "3:00 PM",
+      }),
+      makeStop("3:00 PM", {
         type: "travel",
         name: "Check in",
         detail: "Cozy Studio Mt Vernon · 135 S 14th Ave",
         chips: [],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "6:30 PM",
+      }),
+      makeStop("6:30 PM", {
         type: "food",
         name: "Banquetes Doña Cheli",
         detail:
@@ -45,10 +72,8 @@ export const INITIAL_DAYS: Day[] = [
           { id: uid(), name: "Adobo Mexican Grill", desc: "Fast-casual birria. Open till 3am." },
           { id: uid(), name: "Taco Bahama (Tuckahoe)", desc: "Upscale, creative tacos. 4.9★." },
         ],
-      },
-      {
-        id: uid(),
-        time: "8:00 PM",
+      }),
+      makeStop("8:00 PM", {
         type: "food",
         name: "Tacos El Poblano",
         detail:
@@ -57,37 +82,32 @@ export const INITIAL_DAYS: Day[] = [
         chips: ["OPTIONAL", "CHEAP", "DF FRIENDLY"],
         swaps: [
           { id: uid(), name: "Skip & sleep", desc: "She just flew in from across the country. No shame." },
-          {
-            id: uid(),
-            name: "Taqueria Movil (138 S Broadway)",
-            desc: "Cash-only late-night truck. 5★.",
-          },
+          { id: uid(), name: "Taqueria Movil (138 S Broadway)", desc: "Cash-only late-night truck. 5★." },
         ],
-      },
-    ],
-  },
-  {
-    id: uid(),
-    sort_order: 1,
-    day: "Wednesday",
-    date: "May 27",
-    title: "Natural History",
-    subtitle: "Upper West Side.",
-    blurb:
-      "Met is closed today — perfect day for AMNH. Dinosaurs, blue whale, planetarium. Start with a real NYC bagel.",
-    stops: [
-      {
-        id: uid(),
-        time: "8:30 AM",
+      }),
+    ]
+  ),
+
+  buildDay(
+    {
+      id: uid(),
+      sort_order: 1,
+      day: "Wednesday",
+      date: "May 27",
+      title: "Natural History",
+      subtitle: "Upper West Side.",
+      blurb:
+        "Met is closed today — perfect day for AMNH. Dinosaurs, blue whale, planetarium. Start with a real NYC bagel.",
+    },
+    [
+      makeStop("8:30 AM", {
         type: "travel",
         name: "Metro-North in",
         detail: "Mt Vernon East → Grand Central (~30 min) → 1 train to 81st",
         chips: ["OFF-PEAK"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "9:30 AM",
+      }),
+      makeStop("9:30 AM", {
         type: "food",
         name: "Absolute Bagels (or Barney Greengrass)",
         detail:
@@ -97,20 +117,16 @@ export const INITIAL_DAYS: Day[] = [
           { id: uid(), name: "Barney Greengrass", desc: "541 Amsterdam · sit-down · sturgeon king · iconic." },
           { id: uid(), name: "Tal Bagels (UWS)", desc: "Solid backup, less line." },
         ],
-      },
-      {
-        id: uid(),
-        time: "10:30 AM",
+      }),
+      makeStop("10:30 AM", {
         type: "sight",
         name: "AMNH",
         detail: "American Museum of Natural History · Plan 3 hrs",
         link: "https://www.amnh.org/",
         chips: ["BUY TIX ONLINE", "AYUSHI MUST"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "1:30 PM",
+      }),
+      makeStop("1:30 PM", {
         type: "food",
         name: "Jacob's Pickles",
         detail: "Southern comfort · Many DF options",
@@ -119,19 +135,15 @@ export const INITIAL_DAYS: Day[] = [
           { id: uid(), name: "Shake Shack UWS", desc: "Burgers without cheese, fries are DF." },
           { id: uid(), name: "Joe's Pizza (Carmine)", desc: "Classic slice, quick stop." },
         ],
-      },
-      {
-        id: uid(),
-        time: "3:00 PM",
+      }),
+      makeStop("3:00 PM", {
         type: "sight",
         name: "Central Park stroll",
         detail: "Bethesda Fountain → The Mall → Bow Bridge",
         chips: ["FREE"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "6:30 PM",
+      }),
+      makeStop("6:30 PM", {
         type: "food",
         name: "Xi'an Famous Foods",
         detail: "UES · 78th & 2nd · Hand-ripped cumin lamb noodles",
@@ -146,50 +158,45 @@ export const INITIAL_DAYS: Day[] = [
           { id: uid(), name: "Joe's Pizza Broadway", desc: "Classic slice. Times Sq adjacent." },
           { id: uid(), name: "Keens (move from Thu)", desc: "Old-school steakhouse, if you want big night." },
         ],
-      },
-      {
-        id: uid(),
-        time: "8:00 PM",
+      }),
+      makeStop("8:00 PM", {
         type: "food",
         name: "Van Leeuwen",
         detail: "Vegan ice cream — flavors actually slap",
         chips: ["DF FLAVORS"],
         swaps: [],
-      },
-    ],
-  },
-  {
-    id: uid(),
-    sort_order: 2,
-    day: "Thursday",
-    date: "May 28",
-    title: "Met + Chinatown",
-    subtitle: "museum to dumplings.",
-    blurb: "Big food day. Pace yourself. Cash before Chinatown.",
-    stops: [
-      {
-        id: uid(),
-        time: "10:00 AM",
+      }),
+    ]
+  ),
+
+  buildDay(
+    {
+      id: uid(),
+      sort_order: 2,
+      day: "Thursday",
+      date: "May 28",
+      title: "Met + Chinatown",
+      subtitle: "museum to dumplings.",
+      blurb: "Big food day. Pace yourself. Cash before Chinatown.",
+    },
+    [
+      makeStop("10:00 AM", {
         type: "sight",
         name: "The Met",
         detail: "Egyptian wing · Temple of Dendur · European paintings",
         link: "https://www.metmuseum.org/",
         chips: ["NY ID = PAY WHAT YOU WISH"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "1:00 PM",
+      }),
+      makeStop("1:00 PM", {
         type: "food",
         name: "Katz's Delicatessen",
         detail: "205 E Houston · Pastrami on rye, the move",
         link: "https://katzsdelicatessen.com/",
         chips: ["DF", "NYC CLASSIC"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "2:30 PM",
+      }),
+      makeStop("2:30 PM", {
         type: "food",
         name: "Joe's Shanghai",
         detail: "46 Bowery · Soup dumplings (XLB) — Chinatown dumpling stop",
@@ -198,19 +205,15 @@ export const INITIAL_DAYS: Day[] = [
         swaps: [
           { id: uid(), name: "Shanghai 21", desc: "21 Mott · Also great XLB. Around the corner. Cash only." },
         ],
-      },
-      {
-        id: uid(),
-        time: "4:00 PM",
+      }),
+      makeStop("4:00 PM", {
         type: "sight",
         name: "Chinatown walk",
         detail: "Mott · Mulberry · Little Italy · Nom Wah Tea Parlor for tea",
         chips: [],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "7:30 PM",
+      }),
+      makeStop("7:30 PM", {
         type: "food",
         name: "Keens Steakhouse",
         detail: "72 W 36th · Mutton chop + porterhouse · $$$$",
@@ -220,10 +223,8 @@ export const INITIAL_DAYS: Day[] = [
           { id: uid(), name: "Double Zero", desc: "2nd Ave · Fully vegan pizza. Cheaper, lighter." },
           { id: uid(), name: "Wolfgang's Tribeca", desc: "Mid-tier steakhouse alternative." },
         ],
-      },
-      {
-        id: uid(),
-        time: "10:00 PM",
+      }),
+      makeStop("10:00 PM", {
         type: "food",
         name: "Madame George",
         detail:
@@ -235,57 +236,48 @@ export const INITIAL_DAYS: Day[] = [
           { id: uid(), name: "Sir Henry's (8th Ave)", desc: "Cozy cocktail bar, great vibe, no rez." },
           { id: uid(), name: "Bemelmans Bar (UES)", desc: "Old-school Carlyle classic if you want iconic NYC." },
         ],
-      },
-    ],
-  },
-  {
-    id: uid(),
-    sort_order: 3,
-    day: "Friday",
-    date: "May 29",
-    title: "Westchester",
-    subtitle: "Hudson & home turf.",
-    blurb: "You have the car. Untermyer in the morning, Tarrytown afternoon, Bronx Italian for dinner.",
-    stops: [
-      {
-        id: uid(),
-        time: "10:00 AM",
+      }),
+    ]
+  ),
+
+  buildDay(
+    {
+      id: uid(),
+      sort_order: 3,
+      day: "Friday",
+      date: "May 29",
+      title: "Westchester",
+      subtitle: "Hudson & home turf.",
+      blurb: "You have the car. Untermyer in the morning, Tarrytown afternoon, Bronx Italian for dinner.",
+    },
+    [
+      makeStop("10:00 AM", {
         type: "sight",
         name: "Untermyer Gardens",
         detail: "945 N Broadway, Yonkers · ~10 min from BnB · Persian walled garden, Hudson views",
         link: "http://www.untermyergardens.org/",
         chips: ["AYUSHI MUST", "FREE", "4.8★"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "12:30 PM",
+      }),
+      makeStop("12:30 PM", {
         type: "food",
         name: "Lunch in Tarrytown",
         detail: "Drive ~25 min · Sweet Grass Grill or Mint Premium Foods on Main St",
         chips: [],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "2:00 PM",
+      }),
+      makeStop("2:00 PM", {
         type: "sight",
         name: "Lyndhurst Mansion",
         detail: "635 S Broadway, Tarrytown · Gothic Revival on the Hudson · ~1 hr tour",
         link: "https://www.lyndhurst.org/",
         chips: ["BOOK TOUR AHEAD", "KYKUIT CLOSED 2026"],
         swaps: [
-          {
-            id: uid(),
-            name: "Sleepy Hollow Cemetery",
-            desc: "Free, Washington Irving's grave, atmospheric.",
-          },
+          { id: uid(), name: "Sleepy Hollow Cemetery", desc: "Free, Washington Irving's grave, atmospheric." },
           { id: uid(), name: "Old Croton Aqueduct Trail", desc: "Walk part of the trail along the Hudson." },
         ],
-      },
-      {
-        id: uid(),
-        time: "6:00 PM",
+      }),
+      makeStop("6:00 PM", {
         type: "food",
         name: "Arthur Avenue (Bronx)",
         detail: "Zero Otto Nove or Mario's · REAL Little Italy · ~30 min drive",
@@ -303,149 +295,86 @@ export const INITIAL_DAYS: Day[] = [
           },
           { id: uid(), name: "Taco Bahama (Tuckahoe)", desc: "Upscale taco spot, 4.9★." },
         ],
-      },
-    ],
-  },
-  {
-    id: uid(),
-    sort_order: 4,
-    day: "Saturday",
-    date: "May 30",
-    title: "MoMA + Bagel",
-    subtitle: "one last morning.",
-    blurb: "Check-out 11am, flight ~7:30pm. Bags in the car. Don't pack the day too tight.",
-    stops: [
-      {
-        id: uid(),
-        time: "9:00 AM",
+      }),
+    ]
+  ),
+
+  buildDay(
+    {
+      id: uid(),
+      sort_order: 4,
+      day: "Saturday",
+      date: "May 30",
+      title: "MoMA + Bagel",
+      subtitle: "one last morning.",
+      blurb: "Check-out 11am, flight ~7:30pm. Bags in the car. Don't pack the day too tight.",
+    },
+    [
+      makeStop("9:00 AM", {
         type: "travel",
         name: "Check out & drive in",
         detail: "Bags stay in the car all day · Park near MoMA",
         chips: [],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "10:00 AM",
+      }),
+      makeStop("10:00 AM", {
         type: "food",
         name: "Russ & Daughters",
         detail: "179 E Houston · Iconic bagel + lox · Ask for tofu spread",
         link: "https://www.russanddaughters.com/",
         chips: ["AYUSHI MUST", "DF: tofu cream cheese"],
         swaps: [
-          {
-            id: uid(),
-            name: "Best Bagel & Coffee (W 35th)",
-            desc: "Closer to MoMA. Has vegan cream cheese.",
-          },
+          { id: uid(), name: "Best Bagel & Coffee (W 35th)", desc: "Closer to MoMA. Has vegan cream cheese." },
         ],
-      },
-      {
-        id: uid(),
-        time: "11:30 AM",
+      }),
+      makeStop("11:30 AM", {
         type: "sight",
         name: "MoMA",
         detail: "Van Gogh's Starry Night, Picasso, Dalí, Monet · ~2.5 hrs",
         link: "https://www.moma.org/",
         chips: ["BUY TIX ONLINE"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "2:30 PM",
+      }),
+      makeStop("2:30 PM", {
         type: "food",
         name: "Joe's Pizza Broadway",
         detail: "One last classic slice · 1435 Broadway",
         link: "https://www.joespizzanyc.com/",
         chips: ["NYC CLASSIC"],
         swaps: [{ id: uid(), name: "Xi'an Midtown", desc: "If she's still craving noodles." }],
-      },
-      {
-        id: uid(),
-        time: "3:30 PM",
+      }),
+      makeStop("3:30 PM", {
         type: "sight",
         name: "High Line + Chelsea Market",
         detail: "Or Bryant Park if you want quieter",
         chips: ["FREE"],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "5:00 PM",
+      }),
+      makeStop("5:00 PM", {
         type: "travel",
         name: "Drive to LGA",
         detail: "~30 min · Pad for traffic",
         chips: [],
         swaps: [],
-      },
-      {
-        id: uid(),
-        time: "7:30 PM",
+      }),
+      makeStop("7:30 PM", {
         type: "travel",
         name: "Ayushi's flight",
         detail: "Departure from LGA",
         chips: [],
         swaps: [],
-      },
-    ],
-  },
+      }),
+    ]
+  ),
 ];
 
 export const INITIAL_CHECKS: CheckItem[] = [
-  {
-    id: uid(),
-    sort_order: 0,
-    title: "Reserve Keens (Thu dinner)",
-    description: "keens.com or 212-947-3636",
-    completed: false,
-  },
-  {
-    id: uid(),
-    sort_order: 1,
-    title: "Reserve Madame George (Thu nightcap)",
-    description: "45 W 45th · resy or 646-423-9081 · weekends book up fast",
-    completed: false,
-  },
-  {
-    id: uid(),
-    sort_order: 2,
-    title: "Book Lyndhurst tour (Fri 2pm)",
-    description: "lyndhurst.org · advance tix recommended",
-    completed: false,
-  },
-  {
-    id: uid(),
-    sort_order: 3,
-    title: "Buy AMNH, Met, MoMA tickets online",
-    description: "Met = pay-what-you-wish w/ NY ID",
-    completed: false,
-  },
-  {
-    id: uid(),
-    sort_order: 4,
-    title: "Pull $80 cash before Thursday",
-    description: "Joe's Shanghai, Shanghai 21, Nom Wah, Taqueria Movil = cash only",
-    completed: false,
-  },
-  {
-    id: uid(),
-    sort_order: 5,
-    title: "Confirm tofu spread @ Russ & Daughters",
-    description: "They have it but verify day-of",
-    completed: false,
-  },
-  {
-    id: uid(),
-    sort_order: 6,
-    title: "Check Levain for vegan options",
-    description: "Regular cookies have butter — verify day-of",
-    completed: false,
-  },
-  {
-    id: uid(),
-    sort_order: 7,
-    title: "Charge MetroCard / set up OMNY",
-    description: "Wed + Thu = Metro-North + subway",
-    completed: false,
-  },
+  { id: uid(), sort_order: 0, title: "Reserve Keens (Thu dinner)", description: "keens.com or 212-947-3636", completed: false },
+  { id: uid(), sort_order: 1, title: "Reserve Madame George (Thu nightcap)", description: "45 W 45th · resy or 646-423-9081 · weekends book up fast", completed: false },
+  { id: uid(), sort_order: 2, title: "Book Lyndhurst tour (Fri 2pm)", description: "lyndhurst.org · advance tix recommended", completed: false },
+  { id: uid(), sort_order: 3, title: "Buy AMNH, Met, MoMA tickets online", description: "Met = pay-what-you-wish w/ NY ID", completed: false },
+  { id: uid(), sort_order: 4, title: "Pull $80 cash before Thursday", description: "Joe's Shanghai, Shanghai 21, Nom Wah, Taqueria Movil = cash only", completed: false },
+  { id: uid(), sort_order: 5, title: "Confirm tofu spread @ Russ & Daughters", description: "They have it but verify day-of", completed: false },
+  { id: uid(), sort_order: 6, title: "Check Levain for vegan options", description: "Regular cookies have butter — verify day-of", completed: false },
+  { id: uid(), sort_order: 7, title: "Charge MetroCard / set up OMNY", description: "Wed + Thu = Metro-North + subway", completed: false },
 ];

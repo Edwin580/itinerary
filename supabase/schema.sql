@@ -3,7 +3,9 @@
 -- Run this once in the Supabase SQL editor (Dashboard → SQL editor)
 -- ============================================================
 
--- Days (stops stored as JSONB — keeps the client simple for a personal app)
+-- Days
+--   slots  — ordered TimeSlot[] (the time grid, never reordered)
+--   events — Record<slotId, StopEvent> (content payloads, reassigned on swap)
 create table if not exists days (
   id         text        primary key,
   sort_order integer     not null default 0,
@@ -12,7 +14,8 @@ create table if not exists days (
   title      text        not null,
   subtitle   text        not null,
   blurb      text        not null,
-  stops      jsonb       not null default '[]'::jsonb,
+  slots      jsonb       not null default '[]'::jsonb,
+  events     jsonb       not null default '{}'::jsonb,
   created_at timestamptz default now()
 );
 
@@ -40,8 +43,42 @@ values
 on conflict (key) do nothing;
 
 -- ── Row-level security ───────────────────────────────────────────────────────
--- This is a private personal app — no auth needed.
--- Disable RLS so the anon key can read/write freely.
+-- Private personal app — anon key reads/writes freely.
 alter table days        disable row level security;
 alter table check_items disable row level security;
 alter table app_state   disable row level security;
+
+-- ── Migration: old schema → slots/events model ──────────────────────────────
+-- If you get PGRST204 ("Could not find the 'events' column") you are running
+-- the old schema that had a single `stops jsonb` column.  Run the block below
+-- in the Supabase SQL editor, then reload the app — it will auto-seed.
+--
+-- OPTION A — drop & recreate (recommended; app auto-seeds from INITIAL_DAYS):
+--
+--   drop table if exists days;
+--   create table days (
+--     id         text        primary key,
+--     sort_order integer     not null default 0,
+--     day        text        not null,
+--     date       text        not null,
+--     title      text        not null,
+--     subtitle   text        not null,
+--     blurb      text        not null,
+--     slots      jsonb       not null default '[]'::jsonb,
+--     events     jsonb       not null default '{}'::jsonb,
+--     created_at timestamptz default now()
+--   );
+--   alter table days disable row level security;
+--
+-- OPTION B — add columns in-place (keeps rows; existing rows get empty
+--            slots/events so you'll see no stops until you hit Reset All):
+--
+--   alter table days add column if not exists
+--     slots  jsonb not null default '[]'::jsonb;
+--   alter table days add column if not exists
+--     events jsonb not null default '{}'::jsonb;
+--   -- optional: alter table days drop column if exists stops;
+--
+-- After either option, reload the app.  If the days table is now empty the app
+-- auto-seeds; if rows exist with empty slots/events use "↺ Reset All" in edit
+-- mode to repopulate.

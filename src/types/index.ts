@@ -6,9 +6,19 @@ export interface Swap {
   desc: string;
 }
 
-export interface Stop {
+// ── Time grid ──────────────────────────────────────────────────────────────────
+// A slot is a fixed anchor in the day schedule. Its position never changes —
+// only the event payload sitting inside it moves (e.g. when items are swapped).
+export interface TimeSlot {
   id: string;
   time: string;
+}
+
+// ── Event payload ──────────────────────────────────────────────────────────────
+// All content fields, decoupled from when they happen.
+// An event lives in a slot via Day.events[slotId].
+export interface StopEvent {
+  id: string;
   type: StopType;
   name: string;
   detail: string;
@@ -17,6 +27,7 @@ export interface Stop {
   swaps: Swap[];
 }
 
+// ── Day ────────────────────────────────────────────────────────────────────────
 export interface Day {
   id: string;
   sort_order: number;
@@ -25,7 +36,10 @@ export interface Day {
   title: string;
   subtitle: string;
   blurb: string;
-  stops: Stop[];
+  /** Ordered time grid. Always rendered in this order; never reordered. */
+  slots: TimeSlot[];
+  /** slotId → event payload. Reassign values here to "move" events between slots. */
+  events: Record<string, StopEvent>;
 }
 
 export interface CheckItem {
