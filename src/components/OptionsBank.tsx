@@ -1,6 +1,5 @@
 import React from "react";
 import type { StopEvent, StopType } from "../types";
-import { OPTIONS_BANK } from "../data/optionsBank";
 import { chipClass } from "../lib/chipClass";
 
 // ── Type badge (mirrors StopCard's badgeClass) ─────────────────────────────────
@@ -17,13 +16,14 @@ function badgeClass(type: StopType): string {
 // ── Option card ────────────────────────────────────────────────────────────────
 interface OptionCardProps {
   event: StopEvent;
-  onQuickAdd: (event: StopEvent) => void;
+  /** Called with the event's ID — parent removes it from bankEvents state. */
+  onMove: (eventId: string) => void;
 }
 
-const OptionCard: React.FC<OptionCardProps> = ({ event, onQuickAdd }) => (
+const OptionCard: React.FC<OptionCardProps> = ({ event, onMove }) => (
   <div className="px-4 py-3.5 border-b border-ink/10 last:border-b-0 hover:bg-cream-2/60 transition-colors">
 
-    {/* Top row: badge + name + Quick Add */}
+    {/* Top row: badge + name + Move button */}
     <div className="flex items-start gap-2 mb-1.5">
       <span className={badgeClass(event.type)}>{event.type}</span>
 
@@ -32,9 +32,9 @@ const OptionCard: React.FC<OptionCardProps> = ({ event, onQuickAdd }) => (
       </span>
 
       <button
-        onClick={() => onQuickAdd(event)}
-        title="Quick-add to current day"
-        className="flex-shrink-0 font-mono text-[9px] tracking-[0.12em] uppercase bg-transparent border border-ink/25 text-ink-soft px-2 py-1 cursor-pointer transition-colors hover:bg-ink hover:text-cream hover:border-ink"
+        onClick={() => onMove(event.id)}
+        title="Add to current day's itinerary"
+        className="flex-shrink-0 font-mono text-[9px] tracking-[0.12em] uppercase px-2 py-1 border border-ink/25 text-ink-soft bg-transparent cursor-pointer transition-colors hover:bg-ink hover:text-cream hover:border-ink"
       >
         + ADD
       </button>
@@ -65,76 +65,88 @@ const OptionCard: React.FC<OptionCardProps> = ({ event, onQuickAdd }) => (
   </div>
 );
 
+// ── Empty state ────────────────────────────────────────────────────────────────
+const EmptyBank: React.FC = () => (
+  <div className="flex flex-col items-center justify-center h-full px-6 pb-16 gap-3 text-center">
+    <span className="font-mono text-[28px] opacity-20">✓</span>
+    <p className="font-mono text-[10px] tracking-[0.12em] uppercase text-ink-soft/60 m-0">
+      All stops added
+    </p>
+    <p className="font-mono text-[10px] text-ink-soft/40 m-0 leading-relaxed">
+      Return a stop to the bank from the itinerary to see it here again.
+    </p>
+  </div>
+);
+
 // ── Panel ──────────────────────────────────────────────────────────────────────
 interface OptionsBankProps {
   open: boolean;
   onClose: () => void;
-  /** Not wired to state yet — placeholder for Step 3. */
-  onQuickAdd?: (event: StopEvent) => void;
+  /** Dynamic list driven by useItinerary's bankEvents state. */
+  bankEvents: StopEvent[];
+  /** Moves an event (by ID) from the bank into the current day's itinerary. */
+  onMove: (eventId: string) => void;
 }
 
 export const OptionsBank: React.FC<OptionsBankProps> = ({
   open,
   onClose,
-  onQuickAdd,
-}) => {
-  const handleQuickAdd = onQuickAdd ?? (() => undefined);
+  bankEvents,
+  onMove,
+}) => (
+  <>
+    {/* ── Backdrop ──────────────────────────────────────────────────────────── */}
+    <div
+      onClick={onClose}
+      className={`fixed inset-0 bg-ink/20 z-30 transition-opacity duration-300 ${
+        open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+      }`}
+      aria-hidden="true"
+    />
 
-  return (
-    <>
-      {/* ── Backdrop (visible on smaller screens when panel is open) ────────── */}
-      <div
-        onClick={onClose}
-        className={`fixed inset-0 bg-ink/20 z-30 transition-opacity duration-300 ${
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
-        aria-hidden="true"
-      />
-
-      {/* ── Slide-in panel ─────────────────────────────────────────────────── */}
-      <aside
-        aria-label="Options bank"
-        className={`fixed top-0 right-0 h-full w-[300px] bg-cream border-l border-ink/20 flex flex-col z-40 transition-transform duration-300 ease-in-out shadow-[-8px_0_32px_rgba(26,22,18,0.12)] ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-ink/15 flex-shrink-0">
-          <div>
-            <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink font-semibold">
-              Options Bank
-            </span>
-            <span className="font-mono text-[9px] text-ink-soft ml-2">
-              {OPTIONS_BANK.length} stops
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close options bank"
-            className="font-mono text-[16px] leading-none text-ink/30 hover:text-ink bg-transparent border-none cursor-pointer p-1 transition-colors"
-          >
-            ×
-          </button>
+    {/* ── Slide-in panel ────────────────────────────────────────────────────── */}
+    <aside
+      aria-label="Options bank"
+      className={`fixed top-0 right-0 h-full w-[300px] bg-cream border-l border-ink/20 flex flex-col z-40 transition-transform duration-300 ease-in-out shadow-[-8px_0_32px_rgba(26,22,18,0.12)] ${
+        open ? "translate-x-0" : "translate-x-full"
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-ink/15 flex-shrink-0">
+        <div>
+          <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink font-semibold">
+            Options Bank
+          </span>
+          <span className="font-mono text-[9px] text-ink-soft ml-2">
+            {bankEvents.length} available
+          </span>
         </div>
+        <button
+          onClick={onClose}
+          aria-label="Close options bank"
+          className="font-mono text-[16px] leading-none text-ink/30 hover:text-ink bg-transparent border-none cursor-pointer p-1 transition-colors"
+        >
+          ×
+        </button>
+      </div>
 
-        {/* Sub-header hint */}
-        <div className="px-4 py-2 border-b border-ink/10 flex-shrink-0">
-          <p className="font-mono text-[9px] tracking-[0.08em] text-ink-soft/70 m-0">
-            Pre-vetted stops · tap + ADD to drop into a slot
-          </p>
-        </div>
+      {/* Sub-header hint */}
+      <div className="px-4 py-2 border-b border-ink/10 flex-shrink-0">
+        <p className="font-mono text-[9px] tracking-[0.08em] text-ink-soft/70 m-0">
+          Staging area · + ADD moves a stop into the current day
+        </p>
+      </div>
 
-        {/* Scrollable list */}
-        <div className="flex-1 overflow-y-auto scrollbar-none">
-          {OPTIONS_BANK.map((event) => (
-            <OptionCard
-              key={event.id}
-              event={event}
-              onQuickAdd={handleQuickAdd}
-            />
-          ))}
-        </div>
-      </aside>
-    </>
-  );
-};
+      {/* Scrollable list or empty state */}
+      <div className="flex-1 overflow-y-auto scrollbar-none">
+        {bankEvents.length > 0 ? (
+          bankEvents.map((event) => (
+            <OptionCard key={event.id} event={event} onMove={onMove} />
+          ))
+        ) : (
+          <EmptyBank />
+        )}
+      </div>
+    </aside>
+  </>
+);

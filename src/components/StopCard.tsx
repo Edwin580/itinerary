@@ -38,6 +38,8 @@ interface StopCardProps {
   /** Called when any content field on the event changes. */
   onChangeEvent: (event: StopEvent) => void;
   onDelete: () => void;
+  /** When provided, renders a "← Bank" button that returns this event to the staging bank. */
+  onReturnToBank?: () => void;
   /** If provided, rendered as a drag handle (passed from dnd-kit's useSortable). */
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
   /** Visual feedback when the card is being dragged. */
@@ -55,6 +57,7 @@ export const StopCard: React.FC<StopCardProps> = ({
   onChangeSlot,
   onChangeEvent,
   onDelete,
+  onReturnToBank,
   dragHandleProps,
   isDragging = false,
 }) => {
@@ -127,11 +130,21 @@ export const StopCard: React.FC<StopCardProps> = ({
             ↓
           </button>
 
+          {editing && onReturnToBank && (
+            <button
+              onClick={onReturnToBank}
+              title="Return to options bank"
+              className="ml-1 bg-transparent text-ink-soft border border-ink/20 font-mono text-[9px] tracking-[0.08em] px-1.5 py-0.5 cursor-pointer hover:bg-ink hover:text-cream hover:border-ink transition-colors"
+            >
+              ← BANK
+            </button>
+          )}
+
           {editing && (
             <button
               onClick={onDelete}
               title="Delete stop"
-              className="ml-1 bg-red/15 text-red border border-red/30 font-mono text-[10px] px-1.5 py-0.5 cursor-pointer hover:bg-red hover:text-cream transition-colors"
+              className="ml-0.5 bg-red/15 text-red border border-red/30 font-mono text-[10px] px-1.5 py-0.5 cursor-pointer hover:bg-red hover:text-cream transition-colors"
             >
               ×
             </button>

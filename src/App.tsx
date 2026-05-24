@@ -31,12 +31,15 @@ export default function App() {
     showDay,
     toggleEditing,
     updateCurrentDay,
+    bankEvents,
     updateSlot,
     updateEvent,
     swapEvents,
     reorderEvents,
     insertStop,
     deleteStop,
+    moveToItinerary,
+    returnToBank,
     toggleCheck,
     addCheck,
     removeCheck,
@@ -134,6 +137,7 @@ export default function App() {
               onSwapEvents={swapEvents}
               onInsertStop={insertStop}
               onDeleteStop={deleteStop}
+              onReturnToBank={returnToBank}
             />
           </DndContext>
         )}
@@ -167,10 +171,12 @@ export default function App() {
         onShowDay={handleShowDay}
       />
 
-      {/* Options bank — fixed panel, portal-like; Quick Add not wired yet */}
+      {/* Options bank — fixed panel; moves events between bank and itinerary */}
       <OptionsBank
         open={showOptionsBank}
         onClose={() => setShowOptionsBank(false)}
+        bankEvents={bankEvents}
+        onMove={moveToItinerary}
       />
     </div>
   );

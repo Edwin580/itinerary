@@ -38,6 +38,7 @@ interface SortableStopCardProps {
   onChangeSlot: (patch: Partial<TimeSlot>) => void;
   onChangeEvent: (ev: StopEvent) => void;
   onDelete: () => void;
+  onReturnToBank: () => void;
 }
 
 const SortableStopCard: React.FC<SortableStopCardProps> = ({
@@ -51,6 +52,7 @@ const SortableStopCard: React.FC<SortableStopCardProps> = ({
   onChangeSlot,
   onChangeEvent,
   onDelete,
+  onReturnToBank,
 }) => {
   const {
     attributes,
@@ -84,6 +86,7 @@ const SortableStopCard: React.FC<SortableStopCardProps> = ({
         onChangeSlot={onChangeSlot}
         onChangeEvent={onChangeEvent}
         onDelete={onDelete}
+        onReturnToBank={onReturnToBank}
         isDragging={isDragging}
         dragHandleProps={dragHandleProps}
       />
@@ -105,6 +108,8 @@ interface DayViewProps {
   /** Insert a blank stop at the given index in the slots array. */
   onInsertStop: (atIndex: number) => void;
   onDeleteStop: (slotId: string) => void;
+  /** Return the event at a given slot back to the staging bank. */
+  onReturnToBank: (eventId: string) => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -117,6 +122,7 @@ export const DayView: React.FC<DayViewProps> = ({
   onSwapEvents,
   onInsertStop,
   onDeleteStop,
+  onReturnToBank,
 }) => {
   // Guard against null/undefined from Supabase rows that pre-date the
   // slots/events migration — getDays normalizes these too, but belt-and-suspenders.
@@ -208,6 +214,7 @@ export const DayView: React.FC<DayViewProps> = ({
                 onMoveUp={prevSlot ? () => onSwapEvents(prevSlot.id, slot.id) : () => undefined}
                 onMoveDown={nextSlot ? () => onSwapEvents(slot.id, nextSlot.id) : () => undefined}
                 onDelete={() => onDeleteStop(slot.id)}
+                onReturnToBank={() => onReturnToBank(event.id)}
               />
 
               {/* Insert divider after every card; last one = "add at end" */}

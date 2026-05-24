@@ -3,12 +3,14 @@ import { arrayMove } from "@dnd-kit/sortable";
 import type { Day, CheckItem, TimeSlot, StopEvent } from "../types";
 import * as db from "../lib/db";
 import { INITIAL_DAYS, INITIAL_CHECKS } from "../lib/initialData";
+import { OPTIONS_BANK } from "../data/optionsBank";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 export function useItinerary() {
   const [days, setDays] = useState<Day[]>([]);
   const [checks, setChecks] = useState<CheckItem[]>([]);
+  const [bankEvents, setBankEvents] = useState<StopEvent[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -59,9 +61,19 @@ export function useItinerary() {
           // Always set local state, even if the DB seed failed.
           setDays(INITIAL_DAYS);
           setChecks(INITIAL_CHECKS);
+          // INITIAL_DAYS never contains OPTIONS_BANK IDs, so full bank is available.
+          setBankEvents(OPTIONS_BANK);
         } else {
           setDays(daysData);
           setChecks(checksData);
+          // Filter bank: exclude any events already moved into the itinerary so
+          // the bank and itinerary never show the same item (survives page refresh).
+          const activeIds = new Set(
+            daysData.flatMap((d) =>
+              Object.values(d.events ?? {}).map((e) => (e as StopEvent).id)
+            )
+          );
+          setBankEvents(OPTIONS_BANK.filter((e) => !activeIds.has(e.id)));
         }
 
         if (dayIdxStr !== null) setDayIdx(parseInt(dayIdxStr, 10));
@@ -153,6 +165,67 @@ export function useItinerary() {
           [slotIdB]: events[slotIdA],
         },
       });
+    },
+    [currentDay, updateCurrentDay]
+  );
+
+  // ── Bank ↔ Itinerary transfers ──────────────────────────────────────────────
+
+  /**
+   * Move an event from the staging bank into the current day's itinerary.
+   * Removes it from bankEvents (optimistic), appends a new TBD slot, and
+   * persists both slots + events to Supabase via updateCurrentDay.
+   * The event keeps its original ID — this is a move, not a copy.
+   */
+  const moveToItinerary = useCallback(
+    (eventId: string) => {
+      if (!currentDay) return;
+      const event = bankEvents.find((e) => e.id === eventId);
+      if (!event) return;
+
+      // Optimistically remove from bank
+      setBankEvents((prev) => prev.filter((e) => e.id !== eventId));
+
+      // Append a new slot with a blank time; keep event's original ID
+      const slotId = uid();
+      const newSlot: TimeSlot = { id: slotId, time: "TBD" };
+      const slots = currentDay.slots ?? [];
+      const events = currentDay.events ?? {};
+      updateCurrentDay({
+        slots: [...slots, newSlot],
+        events: { ...events, [slotId]: event },
+      });
+    },
+    [currentDay, bankEvents, updateCurrentDay]
+  );
+
+  /**
+   * Return an active itinerary event back to the staging bank.
+   * Finds the slot holding that event ID, removes it from the current day,
+   * persists the change to Supabase, then appends the event to bankEvents.
+   */
+  const returnToBank = useCallback(
+    (eventId: string) => {
+      if (!currentDay) return;
+      const slots = currentDay.slots ?? [];
+      const events = currentDay.events ?? {};
+
+      // Locate the slot that owns this event
+      const slot = slots.find((s) => events[s.id]?.id === eventId);
+      if (!slot) return;
+      const event = events[slot.id];
+      if (!event) return;
+
+      // Remove the slot + event from the day and persist
+      const newEvents = { ...events };
+      delete newEvents[slot.id];
+      updateCurrentDay({
+        slots: slots.filter((s) => s.id !== slot.id),
+        events: newEvents,
+      });
+
+      // Return the event to the bank
+      setBankEvents((prev) => [...prev, event]);
     },
     [currentDay, updateCurrentDay]
   );
@@ -274,6 +347,7 @@ export function useItinerary() {
     ]);
     setDays(INITIAL_DAYS);
     setChecks(INITIAL_CHECKS);
+    setBankEvents(OPTIONS_BANK); // INITIAL_DAYS has no bank IDs, so full bank is available
     setDayIdx(0);
     setEditing(false);
     void db.setAppState("day_idx", "0");
@@ -283,6 +357,7 @@ export function useItinerary() {
   return {
     days,
     checks,
+    bankEvents,
     dayIdx,
     editing,
     loading,
@@ -299,6 +374,9 @@ export function useItinerary() {
     reorderEvents,
     insertStop,
     deleteStop,
+    // bank ↔ itinerary transfers
+    moveToItinerary,
+    returnToBank,
     // check mutations
     toggleCheck,
     addCheck,
