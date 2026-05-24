@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Day, CheckItem, Stop } from "../types";
+import { arrayMove } from "@dnd-kit/sortable";
+import type { Day, CheckItem, TimeSlot, StopEvent } from "../types";
 import * as db from "../lib/db";
 import { INITIAL_DAYS, INITIAL_CHECKS } from "../lib/initialData";
 
@@ -42,11 +43,20 @@ export function useItinerary() {
         if (cancelled) return;
 
         if (daysData.length === 0) {
-          // First run — seed the DB with initial itinerary data
-          await Promise.all([
-            db.seedDays(INITIAL_DAYS),
-            db.seedChecks(INITIAL_CHECKS),
-          ]);
+          // Empty DB — attempt to seed. If the schema is missing the `slots`/`events`
+          // columns (PGRST204), seeding will fail. We catch that separately so the
+          // app still renders with in-memory defaults instead of hard-crashing.
+          // → Run the migration SQL in supabase/schema.sql to fix persistence.
+          try {
+            await Promise.all([
+              db.seedDays(INITIAL_DAYS),
+              db.seedChecks(INITIAL_CHECKS),
+            ]);
+          } catch {
+            // Seed failed (likely schema mismatch). Fall through — setDays below
+            // still runs so the UI is usable; changes just won't persist to DB.
+          }
+          // Always set local state, even if the DB seed failed.
           setDays(INITIAL_DAYS);
           setChecks(INITIAL_CHECKS);
         } else {
@@ -57,8 +67,13 @@ export function useItinerary() {
         if (dayIdxStr !== null) setDayIdx(parseInt(dayIdxStr, 10));
         if (editingStr !== null) setEditing(editingStr === "true");
       } catch (e) {
-        if (!cancelled)
+        // The initial fetch itself failed (network error, auth error, etc.).
+        // Explicitly clear days so currentDay is null and DayView never renders.
+        if (!cancelled) {
+          setDays([]);
+          setChecks([]);
           setError(e instanceof Error ? e.message : String(e));
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -85,7 +100,7 @@ export function useItinerary() {
     });
   }, []);
 
-  // ── Day / stop mutations ────────────────────────────────────────────────────
+  // ── Day-level mutations ─────────────────────────────────────────────────────
 
   const updateCurrentDay = useCallback(
     (patch: Partial<Day>) => {
@@ -97,41 +112,124 @@ export function useItinerary() {
     [currentDay]
   );
 
-  const updateStop = useCallback(
-    (stopIdx: number, newStop: Stop) => {
+  // ── Slot mutations (time grid — position only) ──────────────────────────────
+
+  /** Update a slot's time string. The grid position (id) never changes. */
+  const updateSlot = useCallback(
+    (slotId: string, patch: Partial<TimeSlot>) => {
       if (!currentDay) return;
-      const newStops = currentDay.stops.map((s, i) =>
-        i === stopIdx ? newStop : s
+      const newSlots = currentDay.slots.map((s) =>
+        s.id === slotId ? { ...s, ...patch } : s
       );
-      updateCurrentDay({ stops: newStops });
+      updateCurrentDay({ slots: newSlots });
     },
     [currentDay, updateCurrentDay]
   );
 
-  const deleteStop = useCallback(
-    (stopIdx: number) => {
+  // ── Event mutations (content payload — moves independently of slots) ────────
+
+  /** Replace the event payload sitting at a given slot. */
+  const updateEvent = useCallback(
+    (slotId: string, event: StopEvent) => {
       if (!currentDay) return;
-      if (!confirm("Delete this stop?")) return;
+      updateCurrentDay({ events: { ...currentDay.events, [slotId]: event } });
+    },
+    [currentDay, updateCurrentDay]
+  );
+
+  /**
+   * Swap the event payloads between two slots.
+   * The slots themselves (time grid) stay locked — only the content moves.
+   * Not wired to UI yet; exported so drag-and-drop can call it directly.
+   */
+  const swapEvents = useCallback(
+    (slotIdA: string, slotIdB: string) => {
+      if (!currentDay) return;
+      const { events } = currentDay;
       updateCurrentDay({
-        stops: currentDay.stops.filter((_, i) => i !== stopIdx),
+        events: {
+          ...events,
+          [slotIdA]: events[slotIdB],
+          [slotIdB]: events[slotIdA],
+        },
       });
     },
     [currentDay, updateCurrentDay]
   );
 
-  const addStop = useCallback(() => {
-    if (!currentDay) return;
-    const newStop: Stop = {
-      id: uid(),
-      time: "TBD",
-      type: "sight",
-      name: "New stop",
-      detail: "",
-      chips: [],
-      swaps: [],
-    };
-    updateCurrentDay({ stops: [...currentDay.stops, newStop] });
-  }, [currentDay, updateCurrentDay]);
+  /**
+   * Insert a new slot + event pair at the given index in the slot array.
+   * Pass `currentDay.slots.length` to append at the end.
+   */
+  const insertStop = useCallback(
+    (atIndex: number) => {
+      if (!currentDay) return;
+      const slotId = uid();
+      const newSlot: TimeSlot = { id: slotId, time: "TBD" };
+      const newEvent: StopEvent = {
+        id: uid(),
+        type: "sight",
+        name: "New stop",
+        detail: "",
+        chips: [],
+        swaps: [],
+      };
+      const newSlots = [
+        ...currentDay.slots.slice(0, atIndex),
+        newSlot,
+        ...currentDay.slots.slice(atIndex),
+      ];
+      updateCurrentDay({
+        slots: newSlots,
+        events: { ...currentDay.events, [slotId]: newEvent },
+      });
+    },
+    [currentDay, updateCurrentDay]
+  );
+
+  /**
+   * Reorder events by moving the event at oldIndex to newIndex.
+   * The slots (time grid) stay fixed; only the mapping of events to slots changes.
+   */
+  const reorderEvents = useCallback(
+    (oldIndex: number, newIndex: number) => {
+      if (!currentDay || oldIndex === newIndex) return;
+      const { slots, events } = currentDay;
+
+      // Build ordered list of event IDs (one per slot)
+      const eventIds = slots.map((s) => events[s.id]?.id).filter((id): id is string => !!id);
+      const newEventIds = arrayMove(eventIds, oldIndex, newIndex);
+
+      // Index events by their own id for quick lookup
+      const eventById: Record<string, StopEvent> = {};
+      Object.values(events).forEach((ev) => { eventById[ev.id] = ev; });
+
+      // Reassign: slot[i] gets the event that ended up at position i
+      const newEvents: Record<string, StopEvent> = {};
+      slots.forEach((slot, i) => {
+        const ev = eventById[newEventIds[i]];
+        if (ev) newEvents[slot.id] = ev;
+      });
+
+      updateCurrentDay({ events: newEvents });
+    },
+    [currentDay, updateCurrentDay]
+  );
+
+  /** Remove a slot and its event from the current day. */
+  const deleteStop = useCallback(
+    (slotId: string) => {
+      if (!currentDay) return;
+      if (!confirm("Delete this stop?")) return;
+      const newEvents = { ...currentDay.events };
+      delete newEvents[slotId];
+      updateCurrentDay({
+        slots: currentDay.slots.filter((s) => s.id !== slotId),
+        events: newEvents,
+      });
+    },
+    [currentDay, updateCurrentDay]
+  );
 
   // ── Check mutations ─────────────────────────────────────────────────────────
 
@@ -194,9 +292,14 @@ export function useItinerary() {
     showDay,
     toggleEditing,
     updateCurrentDay,
-    updateStop,
+    // slot/event mutations
+    updateSlot,
+    updateEvent,
+    swapEvents,
+    reorderEvents,
+    insertStop,
     deleteStop,
-    addStop,
+    // check mutations
     toggleCheck,
     addCheck,
     removeCheck,
