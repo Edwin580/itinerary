@@ -71,9 +71,23 @@ export function useItinerary() {
           setChecks(checksData);
 
           if (bankData !== null) {
-            // Trust the database — it has been seeded (may be empty if all items
-            // were moved into the itinerary, which is valid).
-            setBankEvents(bankData);
+            // Trust the database for existing entries, but also merge in any NEW
+            // OPTIONS_BANK entries whose IDs aren't tracked yet (not in the saved
+            // bank and not live in any day). This handles the case where new entries
+            // are added to optionsBank.ts after the bank_state row was first written.
+            const trackedIds = new Set([
+              ...bankData.map((e) => e.id),
+              ...daysData.flatMap((d) =>
+                Object.values(d.events ?? {}).map((e) => (e as StopEvent).id)
+              ),
+            ]);
+            const newEntries = OPTIONS_BANK.filter((e) => !trackedIds.has(e.id));
+            const mergedBank = newEntries.length > 0 ? [...bankData, ...newEntries] : bankData;
+            if (newEntries.length > 0) {
+              // Persist the merged bank so future loads don't need to re-merge.
+              void db.saveBankEvents(mergedBank);
+            }
+            setBankEvents(mergedBank);
           } else {
             // bank_state row not found: table newly created or row missing.
             // Set correct in-memory state but do NOT auto-save here — that caused
