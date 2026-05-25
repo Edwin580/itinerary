@@ -19,6 +19,17 @@ create table if not exists days (
   created_at timestamptz default now()
 );
 
+-- Options bank — global staging pool (single row, id = 1)
+--   events — StopEvent[] that haven't been moved into a day yet
+create table if not exists bank_state (
+  id     int  primary key default 1,
+  events jsonb not null default '[]'::jsonb
+);
+
+insert into bank_state (id, events)
+values (1, '[]')
+on conflict do nothing;
+
 -- Pre-trip checklist items
 create table if not exists check_items (
   id          text        primary key,
@@ -47,6 +58,7 @@ on conflict (key) do nothing;
 alter table days        disable row level security;
 alter table check_items disable row level security;
 alter table app_state   disable row level security;
+alter table bank_state  disable row level security;
 
 -- ── Migration: old schema → slots/events model ──────────────────────────────
 -- If you get PGRST204 ("Could not find the 'events' column") you are running

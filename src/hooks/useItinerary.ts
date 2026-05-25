@@ -35,9 +35,10 @@ export function useItinerary() {
 
     async function load() {
       try {
-        const [daysData, checksData, dayIdxStr, editingStr] = await Promise.all([
+        const [daysData, checksData, bankData, dayIdxStr, editingStr] = await Promise.all([
           db.getDays(),
           db.getChecks(),
+          db.getBankEvents(), // null = table missing or row not seeded yet
           db.getAppState("day_idx"),
           db.getAppState("editing"),
         ]);
@@ -61,19 +62,32 @@ export function useItinerary() {
           // Always set local state, even if the DB seed failed.
           setDays(INITIAL_DAYS);
           setChecks(INITIAL_CHECKS);
-          // INITIAL_DAYS never contains OPTIONS_BANK IDs, so full bank is available.
+          // INITIAL_DAYS never contains OPTIONS_BANK IDs — full bank is available.
+          // Do NOT call saveBankEvents here — load() must be read-only.
+          // The bank_state row is created on the first moveToItinerary/returnToBank call.
           setBankEvents(OPTIONS_BANK);
         } else {
           setDays(daysData);
           setChecks(checksData);
-          // Filter bank: exclude any events already moved into the itinerary so
-          // the bank and itinerary never show the same item (survives page refresh).
-          const activeIds = new Set(
-            daysData.flatMap((d) =>
-              Object.values(d.events ?? {}).map((e) => (e as StopEvent).id)
-            )
-          );
-          setBankEvents(OPTIONS_BANK.filter((e) => !activeIds.has(e.id)));
+
+          if (bankData !== null) {
+            // Trust the database — it has been seeded (may be empty if all items
+            // were moved into the itinerary, which is valid).
+            setBankEvents(bankData);
+          } else {
+            // bank_state row not found: table newly created or row missing.
+            // Set correct in-memory state but do NOT auto-save here — that caused
+            // the bank to be overwritten with defaults on every refresh when the
+            // bank_state table/row was absent. The row is created on the first
+            // explicit moveToItinerary() or returnToBank() call instead.
+            const activeIds = new Set(
+              daysData.flatMap((d) =>
+                Object.values(d.events ?? {}).map((e) => (e as StopEvent).id)
+              )
+            );
+            const initialBank = OPTIONS_BANK.filter((e) => !activeIds.has(e.id));
+            setBankEvents(initialBank);
+          }
         }
 
         if (dayIdxStr !== null) setDayIdx(parseInt(dayIdxStr, 10));
@@ -183,8 +197,10 @@ export function useItinerary() {
       const event = bankEvents.find((e) => e.id === eventId);
       if (!event) return;
 
-      // Optimistically remove from bank
-      setBankEvents((prev) => prev.filter((e) => e.id !== eventId));
+      // Remove from bank and persist the new bank state
+      const newBank = bankEvents.filter((e) => e.id !== eventId);
+      setBankEvents(newBank);
+      void db.saveBankEvents(newBank);
 
       // Append a new slot with a blank time; keep event's original ID
       const slotId = uid();
@@ -224,10 +240,15 @@ export function useItinerary() {
         events: newEvents,
       });
 
-      // Return the event to the bank
-      setBankEvents((prev) => [...prev, event]);
+      // Return the event to the bank and persist.
+      // NOTE: bankEvents must be in the dep array (below) — without it this
+      // callback closes over the stale initial [] and overwrites the bank with
+      // only the single returned event, corrupting Supabase on every call.
+      const newBank = [...bankEvents, event];
+      setBankEvents(newBank);
+      void db.saveBankEvents(newBank);
     },
-    [currentDay, updateCurrentDay]
+    [currentDay, bankEvents, updateCurrentDay]
   );
 
   /**
@@ -347,7 +368,8 @@ export function useItinerary() {
     ]);
     setDays(INITIAL_DAYS);
     setChecks(INITIAL_CHECKS);
-    setBankEvents(OPTIONS_BANK); // INITIAL_DAYS has no bank IDs, so full bank is available
+    setBankEvents(OPTIONS_BANK);
+    void db.saveBankEvents(OPTIONS_BANK);
     setDayIdx(0);
     setEditing(false);
     void db.setAppState("day_idx", "0");
