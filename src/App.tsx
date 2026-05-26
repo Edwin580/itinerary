@@ -157,7 +157,7 @@ export default function App() {
       )}
 
       <footer className="mt-10 pt-5 border-t border-ink/15 text-center font-mono text-[9px] tracking-[0.15em] uppercase text-ink-soft">
-        Made <span className="text-red">♥</span> for Edwin · all edits synced to cloud
+        Made <span className="text-red">♥</span> for Ayushi · all edits syced, trust
       </footer>
 
       <TodayPill

@@ -5,7 +5,7 @@ export const AppHeader: React.FC = () => (
     {/* Kicker */}
     <div className="font-mono text-[10px] tracking-[0.15em] uppercase text-ink-soft flex items-center gap-1.5 mb-4">
       <span className="inline-block w-1.5 h-1.5 bg-red rounded-full animate-pulse-dot" />
-      NYC TRIP · 5 DAYS
+      YONK/NYC TRIP · 5 DAYS
     </div>
 
     {/* Main title */}
@@ -14,7 +14,7 @@ export const AppHeader: React.FC = () => (
       <span className="italic text-red font-serif font-light">&</span>{" "}
       Ayushi
       <span className="block italic text-[0.55em] text-ink-soft mt-1 font-display">
-        in the city.
+        in the Yonk/NYC.
       </span>
     </h1>
 
@@ -22,7 +22,7 @@ export const AppHeader: React.FC = () => (
     <div className="font-mono text-[11px] text-ink-soft mt-3 leading-relaxed">
       <b className="text-ink font-semibold">MAY 26 → 30, 2026</b>
       <br />
-      Base: Cozy Studio · 135 S 14th Ave, Mt Vernon
+      Base: bnb · 135 S 14th Ave, Mt Vernon
       <br />
       Flights: LGA (in Tue ~2pm · out Sat ~7:30pm)
       <br />
