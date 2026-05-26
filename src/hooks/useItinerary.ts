@@ -3,12 +3,14 @@ import { arrayMove } from "@dnd-kit/sortable";
 import type { Day, CheckItem, TimeSlot, StopEvent } from "../types";
 import * as db from "../lib/db";
 import { INITIAL_DAYS, INITIAL_CHECKS } from "../lib/initialData";
+import { OPTIONS_BANK } from "../data/optionsBank";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 export function useItinerary() {
   const [days, setDays] = useState<Day[]>([]);
   const [checks, setChecks] = useState<CheckItem[]>([]);
+  const [bankEvents, setBankEvents] = useState<StopEvent[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -18,7 +20,7 @@ export function useItinerary() {
   // Detect which trip day is "today" (active only during May 26–30 2026)
   useEffect(() => {
     const now = new Date();
-    const start = new Date("2026-05-26");
+    const start = new Date("2026-05-26T00:00:00");
     const end = new Date("2026-05-30T23:59");
     if (now >= start && now <= end) {
       setTodayActive(
@@ -33,9 +35,10 @@ export function useItinerary() {
 
     async function load() {
       try {
-        const [daysData, checksData, dayIdxStr, editingStr] = await Promise.all([
+        const [daysData, checksData, bankData, dayIdxStr, editingStr] = await Promise.all([
           db.getDays(),
           db.getChecks(),
+          db.getBankEvents(), // null = table missing or row not seeded yet
           db.getAppState("day_idx"),
           db.getAppState("editing"),
         ]);
@@ -59,9 +62,46 @@ export function useItinerary() {
           // Always set local state, even if the DB seed failed.
           setDays(INITIAL_DAYS);
           setChecks(INITIAL_CHECKS);
+          // INITIAL_DAYS never contains OPTIONS_BANK IDs — full bank is available.
+          // Do NOT call saveBankEvents here — load() must be read-only.
+          // The bank_state row is created on the first moveToItinerary/returnToBank call.
+          setBankEvents(OPTIONS_BANK);
         } else {
           setDays(daysData);
           setChecks(checksData);
+
+          if (bankData !== null) {
+            // Trust the database for existing entries, but also merge in any NEW
+            // OPTIONS_BANK entries whose IDs aren't tracked yet (not in the saved
+            // bank and not live in any day). This handles the case where new entries
+            // are added to optionsBank.ts after the bank_state row was first written.
+            const trackedIds = new Set([
+              ...bankData.map((e) => e.id),
+              ...daysData.flatMap((d) =>
+                Object.values(d.events ?? {}).map((e) => (e as StopEvent).id)
+              ),
+            ]);
+            const newEntries = OPTIONS_BANK.filter((e) => !trackedIds.has(e.id));
+            const mergedBank = newEntries.length > 0 ? [...bankData, ...newEntries] : bankData;
+            if (newEntries.length > 0) {
+              // Persist the merged bank so future loads don't need to re-merge.
+              void db.saveBankEvents(mergedBank);
+            }
+            setBankEvents(mergedBank);
+          } else {
+            // bank_state row not found: table newly created or row missing.
+            // Set correct in-memory state but do NOT auto-save here — that caused
+            // the bank to be overwritten with defaults on every refresh when the
+            // bank_state table/row was absent. The row is created on the first
+            // explicit moveToItinerary() or returnToBank() call instead.
+            const activeIds = new Set(
+              daysData.flatMap((d) =>
+                Object.values(d.events ?? {}).map((e) => (e as StopEvent).id)
+              )
+            );
+            const initialBank = OPTIONS_BANK.filter((e) => !activeIds.has(e.id));
+            setBankEvents(initialBank);
+          }
         }
 
         if (dayIdxStr !== null) setDayIdx(parseInt(dayIdxStr, 10));
@@ -155,6 +195,74 @@ export function useItinerary() {
       });
     },
     [currentDay, updateCurrentDay]
+  );
+
+  // ── Bank ↔ Itinerary transfers ──────────────────────────────────────────────
+
+  /**
+   * Move an event from the staging bank into the current day's itinerary.
+   * Removes it from bankEvents (optimistic), appends a new TBD slot, and
+   * persists both slots + events to Supabase via updateCurrentDay.
+   * The event keeps its original ID — this is a move, not a copy.
+   */
+  const moveToItinerary = useCallback(
+    (eventId: string) => {
+      if (!currentDay) return;
+      const event = bankEvents.find((e) => e.id === eventId);
+      if (!event) return;
+
+      // Remove from bank and persist the new bank state
+      const newBank = bankEvents.filter((e) => e.id !== eventId);
+      setBankEvents(newBank);
+      void db.saveBankEvents(newBank);
+
+      // Append a new slot with a blank time; keep event's original ID
+      const slotId = uid();
+      const newSlot: TimeSlot = { id: slotId, time: "TBD" };
+      const slots = currentDay.slots ?? [];
+      const events = currentDay.events ?? {};
+      updateCurrentDay({
+        slots: [...slots, newSlot],
+        events: { ...events, [slotId]: event },
+      });
+    },
+    [currentDay, bankEvents, updateCurrentDay]
+  );
+
+  /**
+   * Return an active itinerary event back to the staging bank.
+   * Finds the slot holding that event ID, removes it from the current day,
+   * persists the change to Supabase, then appends the event to bankEvents.
+   */
+  const returnToBank = useCallback(
+    (eventId: string) => {
+      if (!currentDay) return;
+      const slots = currentDay.slots ?? [];
+      const events = currentDay.events ?? {};
+
+      // Locate the slot that owns this event
+      const slot = slots.find((s) => events[s.id]?.id === eventId);
+      if (!slot) return;
+      const event = events[slot.id];
+      if (!event) return;
+
+      // Remove the slot + event from the day and persist
+      const newEvents = { ...events };
+      delete newEvents[slot.id];
+      updateCurrentDay({
+        slots: slots.filter((s) => s.id !== slot.id),
+        events: newEvents,
+      });
+
+      // Return the event to the bank and persist.
+      // NOTE: bankEvents must be in the dep array (below) — without it this
+      // callback closes over the stale initial [] and overwrites the bank with
+      // only the single returned event, corrupting Supabase on every call.
+      const newBank = [...bankEvents, event];
+      setBankEvents(newBank);
+      void db.saveBankEvents(newBank);
+    },
+    [currentDay, bankEvents, updateCurrentDay]
   );
 
   /**
@@ -274,6 +382,8 @@ export function useItinerary() {
     ]);
     setDays(INITIAL_DAYS);
     setChecks(INITIAL_CHECKS);
+    setBankEvents(OPTIONS_BANK);
+    void db.saveBankEvents(OPTIONS_BANK);
     setDayIdx(0);
     setEditing(false);
     void db.setAppState("day_idx", "0");
@@ -283,6 +393,7 @@ export function useItinerary() {
   return {
     days,
     checks,
+    bankEvents,
     dayIdx,
     editing,
     loading,
@@ -299,6 +410,9 @@ export function useItinerary() {
     reorderEvents,
     insertStop,
     deleteStop,
+    // bank ↔ itinerary transfers
+    moveToItinerary,
+    returnToBank,
     // check mutations
     toggleCheck,
     addCheck,
