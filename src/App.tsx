@@ -111,7 +111,7 @@ export default function App() {
   }
 
   return (
-    <div className="max-w-[720px] mx-auto px-5 pt-6 pb-[140px] relative">
+    <div className="max-w-[720px] mx-auto px-5 pt-[max(env(safe-area-inset-top),_1.5rem)] pb-[140px] relative">
       <AppHeader />
 
       <DayNav days={days} dayIdx={dayIdx} onShowDay={handleShowDay} />

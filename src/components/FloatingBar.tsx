@@ -16,7 +16,7 @@ export const FloatingBar: React.FC<FloatingBarProps> = ({
   bankCount,
 }) => (
   <div
-    className="fixed bottom-0 left-0 right-0 z-20 border-t border-ink/12"
+    className="fixed bottom-0 left-0 right-0 z-20 border-t border-ink/12 pb-[max(env(safe-area-inset-bottom),_1rem)]"
     style={{
       backdropFilter: "blur(14px)",
       WebkitBackdropFilter: "blur(14px)",
