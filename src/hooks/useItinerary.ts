@@ -20,7 +20,7 @@ export function useItinerary() {
   // Detect which trip day is "today" (active only during May 26–30 2026)
   useEffect(() => {
     const now = new Date();
-    const start = new Date("2026-05-26");
+    const start = new Date("2026-05-26T00:00:00");
     const end = new Date("2026-05-30T23:59");
     if (now >= start && now <= end) {
       setTodayActive(
