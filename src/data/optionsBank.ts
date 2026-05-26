@@ -336,4 +336,80 @@ export const OPTIONS_BANK: StopEvent[] = [
     chips: ["~30 MIN"],
     swaps: [],
   },
+
+  // ── Mexican ──────────────────────────────────────────────────────────────────
+
+  {
+    id: "opt-limosneros",
+    type: "food",
+    name: "Limosneros — Bottomless Tacos",
+    detail:
+      "Williamsburg Mexican spot with bottomless tacos for $20/person (90 min). Proteins: chicken tinga, steak, carnitas, al pastor, veggie, fish — birria +$5. Add bottomless drinks for +$20/person. Outdoor patio. Available Tues & Wed 3–11 pm only — May 27 and May 28 both work for the trip.",
+    link: "https://limosnerosbk.com",
+    chips: ["DF FRIENDLY", "RESERVE", "~1.5 HRS"],
+    swaps: [],
+  },
+
+  // ── Chinatown ────────────────────────────────────────────────────────────────
+
+  {
+    id: "opt-wonton-1978",
+    type: "food",
+    name: "Wonton Noodle 1978",
+    detail:
+      "Chinatown institution at 56 Mott St, open since 1978. Handmade wontons in broth, hand-pulled noodle soups, and dim sum. The kind of place that hasn't changed in 40 years — in a good way.",
+    link: "https://www.wontonnoodleny.com",
+    chips: ["CASH ONLY", "DF FRIENDLY", "~1 HR"],
+    swaps: [],
+  },
+
+  // ── Indian ───────────────────────────────────────────────────────────────────
+
+  {
+    id: "opt-dhamaka",
+    type: "food",
+    name: "Dhamaka",
+    detail:
+      "Unapologetic provincial Indian at Essex Market (119 Delancey St, LES). James Beard Award-winning chef Chintan Pandya — bold spices, fierce heat, dishes you don't see on typical menus. Tell them upfront about dairy-free: many dishes work, some don't.",
+    link: "https://www.dhamaka.nyc",
+    chips: ["RESERVE", "MUST", "~1.5 HRS"],
+    swaps: [],
+  },
+
+  // ── Bars ─────────────────────────────────────────────────────────────────────
+
+  {
+    id: "opt-attaboy",
+    type: "sight",
+    name: "Attaboy",
+    detail:
+      "No-menu cocktail bar on the LES — 134 Eldridge St, no sign outside. Tell the bartender what spirits and flavors you like and they make something for you. Invented the Penicillin and the Paper Plane. #37 on North America's 50 Best Bars 2026. Open 5 pm – 3 am daily, 28 seats.",
+    link: "https://attaboy.us",
+    chips: ["NIGHTCAP", "~1.5 HRS"],
+    swaps: [],
+  },
+
+  // ── Dessert & Cafes ──────────────────────────────────────────────────────────
+
+  {
+    id: "opt-morgensterns",
+    type: "food",
+    name: "Morgenstern's Finest Ice Cream",
+    detail:
+      "Quirky LES ice cream parlor back at 2 Rivington St (reopened April 2026). Unusual flavors — pineapple salted egg yolk, bitter black chocolate ash, olive oil chocolate sorbet. DF-friendly sorbets available. Smaller and more curated than the old location.",
+    link: "https://www.morgensternsnyc.com",
+    chips: ["DF FRIENDLY", "~30 MIN"],
+    swaps: [],
+  },
+
+  {
+    id: "opt-taikii-cafe",
+    type: "food",
+    name: "Taikii Cafe",
+    detail:
+      "Tiny Japanese vinyl cafe at 55 Clinton St on the LES (opened April 2026). Specialty coffee, matcha, hojicha, and inari sushi while records play in the background. Very small — good for a slow morning or a mid-afternoon reset between stops.",
+    link: "https://www.instagram.com/taikii__cafe_les/",
+    chips: ["DF FRIENDLY", "~45 MIN"],
+    swaps: [],
+  },
 ];
