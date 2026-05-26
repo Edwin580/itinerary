@@ -8,7 +8,7 @@ interface DayNavProps {
 }
 
 export const DayNav: React.FC<DayNavProps> = ({ days, dayIdx, onShowDay }) => (
-  <nav className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-5 mb-6 px-5 py-3 sticky top-0 bg-cream z-10 border-b border-ink/15">
+  <nav className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-5 mb-6 px-5 py-3 border-b border-ink/15">
     {days.map((d, i) => (
       <button
         key={d.id}

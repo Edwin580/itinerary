@@ -17,6 +17,7 @@ import { DayView } from "./components/DayView";
 import { Checklist } from "./components/Checklist";
 import { TodayPill } from "./components/TodayPill";
 import { OptionsBank } from "./components/OptionsBank";
+import { FloatingBar } from "./components/FloatingBar";
 
 export default function App() {
   const {
@@ -110,13 +111,8 @@ export default function App() {
   }
 
   return (
-    <div className="max-w-[720px] mx-auto px-5 pt-6 pb-[120px] relative">
-      <AppHeader
-        editing={editing}
-        onToggleEdit={toggleEditing}
-        showingOptions={showOptionsBank}
-        onToggleOptions={() => setShowOptionsBank((v) => !v)}
-      />
+    <div className="max-w-[720px] mx-auto px-5 pt-6 pb-[140px] relative">
+      <AppHeader />
 
       <DayNav days={days} dayIdx={dayIdx} onShowDay={handleShowDay} />
 
@@ -177,6 +173,15 @@ export default function App() {
         onClose={() => setShowOptionsBank(false)}
         bankEvents={bankEvents}
         onMove={moveToItinerary}
+      />
+
+      {/* Floating action bar — persists through all scroll positions */}
+      <FloatingBar
+        editing={editing}
+        onToggleEdit={toggleEditing}
+        showingOptions={showOptionsBank}
+        onToggleOptions={() => setShowOptionsBank((v) => !v)}
+        bankCount={bankEvents.length}
       />
     </div>
   );
